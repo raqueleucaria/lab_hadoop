@@ -1,6 +1,6 @@
 # Virtualização
 
-Para construir o cluster que abrigartá o serviço do Hadoop foram criados 4 VMs com o qemu/libvirt/virt-manager.
+Para construir o cluster que abrigará o serviço do Hadoop foram criados 4 VMs com o qemu/libvirt/virt-manager.
 
 - master
 - slave-1
@@ -9,7 +9,44 @@ Para construir o cluster que abrigartá o serviço do Hadoop foram criados 4 VMs
 
 ## Instalação
 
-Baixa o virt-manager ele vai baixar o virt por baixo e demais modulos. Dê acesso ao seu usuario ao grupo libvirt e kvm. Verifique se o computador suporta virtualizacao, se tiver desativado ative na BIOS. Baixe a iso  do ubuntu server. 
+Baixe o virt-manager. Ele vai baixar o virt por baixo e demais modulos. 
+
+```bash
+sudo apt update
+sudo apt install virt-manager qemu-kvm libvirt-daemon-system libvirt-clients bridge-utils
+```
+
+Dê acesso ao seu usuário ao grupo libvirt e kvm. 
+
+```bash
+sudo usermod -aG libvirt $(whoami)
+sudo usermod -aG kvm $(whoami)
+```
+
+Verifique se o computador suporta virtualizacao, se tiver desativado ative na BIOS. 
+Execute o comando:
+```bash
+egrep -c '(vmx|svm)' /proc/cpuinfo
+```
+Se o resultado for 0, seu processador não suporta virtualização (ou está desativada na BIOS).
+
+Se o resultado for maior que 0, ele suporta
+
+
+```bash
+sudo systemctl enable --now libvirtd
+sudo systemctl status libvirtd
+```
+
+Baixe a iso do ubuntu server. 
+
+[https://ubuntu.com/download/server](https://ubuntu.com/download/server)
+
+Ou pelo terminal (exemplo com Ubuntu Server 24.04.3):
+
+```bash
+wget https://releases.ubuntu.com/noble/ubuntu-24.04.3-live-server-amd64.iso
+```
 
 ## Criando as VMs
 
