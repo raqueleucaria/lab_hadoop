@@ -1,6 +1,6 @@
 # Instalação do Hadoop
 
-## Pré-Reuisito:
+## Pré-Requisito:
 É preciso ter o java
    
 Atualize: `sudo apt update && sudo apt upgrade -y`
