@@ -1,0 +1,5 @@
+discord==2.3.2
+kafka-python==2.2.15
+python-dotenv==1.0.1
+pyspark
+findspark
