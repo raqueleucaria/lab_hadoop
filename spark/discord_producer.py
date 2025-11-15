@@ -3,8 +3,10 @@ import os
 import json
 import discord
 import datetime
-
+from dotenv import load_dotenv
 from kafka import KafkaProducer
+
+load_dotenv()
 
 KAFKA_SERVER = 'localhost:9092' # Conecta ao Kafka no Docker
 KAFKA_TOPIC = 'discord_messages'
@@ -42,7 +44,7 @@ class DiscordToKafka(discord.Client):
 
         # Envia a mensagem para o Kafka
         producer.send(KAFKA_TOPIC, value=data)
-        print(f"✅ Enviado: {data['content'][:50]}... para o tópico {KAFKA_TOPIC}")
+        print(f"[{datetime.datetime.now()}] {KAFKA_TOPIC} - Mensagem: {data['content'][:50]}")
 
 client = DiscordToKafka()
 client.run(BOT_TOKEN)
