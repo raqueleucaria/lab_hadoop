@@ -5,10 +5,10 @@ arquivos=("arqp" "poema01" "poema02" "procjuizes")
 
 # Recria a estrutura de pastas no HDFS
 echo "Criando pasta base no HDFS..."
-hdfs dfs -mkdir -p /user/hadoop/wordCount/input
+hdfs dfs -mkdir -p /user/hadoop/input
 
 # Envia todos os arquivos de texto para o HDFS
-hdfs dfs -put textos/* /user/hadoop/wordCount/input
+hdfs dfs -put textos/* /user/hadoop/input
 
 # Loop para processar cada arquivo
 for arquivo in "${arquivos[@]}"; do
@@ -17,8 +17,8 @@ for arquivo in "${arquivos[@]}"; do
     echo "------------------------------"
     
     # Define caminhos
-    INPUT_PATH="/user/hadoop/wordCount/input"
-    OUTPUT_PATH="/user/hadoop/wordCount/output/$arquivo"
+    INPUT_PATH="/user/hadoop/input"
+    OUTPUT_PATH="/user/hadoop/output"
 
     # Limpeza preventiva do output
     hdfs dfs -rm -r $OUTPUT_PATH 2>/dev/null
