@@ -1,0 +1,52 @@
+# 1. Imagem Base: Começa com o Python 3.8
+FROM python:3.8-slim-bookworm
+LABEL maintainer="spark-manual-build"
+
+# Define o diretório de trabalho
+WORKDIR /app
+
+# 2. Instala Dependências do Sistema
+#    - openjdk-11-jdk: Necessário para o Spark (Java)
+#    - wget: Para baixar o Spark
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    openjdk-17-jre-headless \
+    wget \
+    && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# 3. Baixa e Instala o Spark Manualmente
+# Define as variáveis de versão
+ENV SPARK_VERSION=3.5.0
+ENV HADOOP_VERSION=3
+# O link de download do arquivo do Spark
+ENV SPARK_ARCHIVE_URL=https://archive.apache.org/dist/spark/spark-${SPARK_VERSION}/spark-${SPARK_VERSION}-bin-hadoop${HADOOP_VERSION}.tgz
+
+RUN wget ${SPARK_ARCHIVE_URL} && \
+    # Descompacta o Spark para /opt/
+    tar -xvzf spark-${SPARK_VERSION}-bin-hadoop${HADOOP_VERSION}.tgz -C /opt && \
+    # Remove o arquivo .tgz para economizar espaço
+    rm spark-${SPARK_VERSION}-bin-hadoop${HADOOP_VERSION}.tgz
+
+# 4. Configura as Variáveis de Ambiente
+# Aponta para onde o Spark e o Java estão instalados
+ENV SPARK_HOME=/opt/spark-3.5.0-bin-hadoop3
+ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+ENV PATH=$PATH:$JAVA_HOME/bin:$SPARK_HOME/bin
+
+# CRUCIAL: Diz ao Python onde encontrar a biblioteca 'pyspark'
+# Esta é a principal razão pela qual `findspark.init()` não é necessário
+ENV PYTHONPATH=$SPARK_HOME/python:$SPARK_HOME/python/lib/py4j-0.10.9.7-src.zip
+
+# 5. Prepara o Script da Aplicação
+# Cria o diretório de checkpoint que o script espera
+RUN mkdir -p /app/tmp/spark-checkpoint
+
+# Copia o script do consumidor para dentro do container
+COPY consumer.py .
+
+# 6. Comando de Execução
+# Este é o comando que será executado quando o container iniciar.
+# O script `consumer.py` já contém as dependências (--packages) no código.
+CMD ["spark-submit", "--master", "local[*]", "/app/consumer.py"]

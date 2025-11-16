@@ -1,0 +1,92 @@
+version: '3.8'
+
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: zookeeper
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - data-network
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    networks:
+      - data-network
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    container_name: elasticsearch
+    ports:
+      - "9200:9200"
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    volumes:
+      - esdata:/usr/share/elasticsearch/data
+    networks:
+      - data-network
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.11.0
+    container_name: kibana
+    depends_on:
+      - elasticsearch
+    ports:
+      - "5601:5601"
+    environment:
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+    networks:
+      - data-network
+
+  # --- NOVO SERVIÇO SPARK ---
+  spark-consumer:
+    # SUBSTITUA 'image:' por 'build:'
+    build:
+      context: .
+      dockerfile: Dockerfile.consumer
+    container_name: spark-consumer
+    depends_on:
+      - kafka
+      - elasticsearch
+    volumes:
+      # O volume agora só é necessário para o checkpoint, 
+      # pois o script já está copiado para dentro da imagem.
+      - ./tmp:/app/tmp 
+    networks:
+      - data-network
+  
+  discord-producer:
+    container_name: discord-producer
+    # Constrói a imagem a partir do nosso novo Dockerfile
+    build:
+      context: . # Usa o diretório atual
+      dockerfile: Dockerfile.producer # Aponta para o arquivo específico
+    depends_on:
+      - kafka # Só inicia depois que o Kafka estiver pronto
+    networks:
+      - data-network
+    env_file:
+      - ./.env # Carrega o arquivo .env para injetar o BOT_TOKEN
+
+volumes:
+  esdata:
+
+networks:
+  data-network: # Define a rede para todos os serviços

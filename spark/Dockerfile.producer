@@ -1,0 +1,17 @@
+# Dockerfile.producer
+
+# Use a mesma imagem base do Python para manter a consistência
+FROM python:3.8-slim-bookworm
+
+WORKDIR /app
+
+COPY requirements.txt .
+
+# Instala as dependências do producer
+RUN pip install -r requirements.txt
+
+# Copia o script do producer para dentro da imagem
+COPY discord_producer.py .
+
+# Comando para rodar o bot quando o container iniciar
+CMD ["python", "discord_producer.py"]
