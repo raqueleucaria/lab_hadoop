@@ -132,8 +132,21 @@ export HADOOP_CONF_DIR=$HADOOP_HOME/etc/hadoop
 		```xml
 		<configuration>
 			<property>
-					<name>mapreduce.framework.name</name>
-					<value>yarn</value>
+				<name>mapreduce.framework.name</name>
+				<value>yarn</value>
+			</property>
+
+			<property>
+				<name>yarn.app.mapreduce.am.env</name>
+				<value>HADOOP_MAPRED_HOME=/usr/local/hadoop</value>
+			</property>
+			<property>
+				<name>mapreduce.map.env</name>
+				<value>HADOOP_MAPRED_HOME=/usr/local/hadoop</value>
+			</property>
+			<property>
+				<name>mapreduce.reduce.env</name>
+				<value>HADOOP_MAPRED_HOME=/usr/local/hadoop</value>
 			</property>
 		</configuration>
 		```
