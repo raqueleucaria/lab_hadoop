@@ -1,31 +1,27 @@
-# spark_consumer.py
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, from_json, count, window
-from pyspark.sql.types import StructType, StructField, StringType, TimestampType
-# import findspark # REMOVIDO! Não é mais necessário.
+from pyspark.sql.functions import *
+from pyspark.sql.types import *
 
-# findspark.init() # REMOVIDO!
-
-# --- Configurações ---
-# ATENÇÃO: Mudamos os hosts de 'localhost' para os nomes dos containers
-KAFKA_SERVER = 'kafka:29092'
-KAFKA_TOPIC = 'discord_messages'
-
-SPARK_PACKAGES = (
-    'org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0,'
-    'org.elasticsearch:elasticsearch-spark-30_2.12:8.11.0'
-)
-ES_INDEX = 'discord_analytics'
-
-# ATENÇÃO: Mudamos o caminho do checkpoint para o caminho DENTRO do container
-CHECKPOINT_DIR = '/app/tmp/spark-checkpoint' 
-
+# Inicializa sessão Spark
 spark = SparkSession.builder \
-    .appName("DiscordKafkaConsumerDocker") \
-    .config("spark.jars.packages", SPARK_PACKAGES) \
-    .getOrCreate() # O 'getOrCreate' vai funcionar pois o script já está no ambiente Spark
+    .appName("DiscordKafkaConsumer") \
+    .config("spark.sql.shuffle.partitions", "2") \
+    .getOrCreate()
 
-# Esquema do JSON
+spark.sparkContext.setLogLevel("WARN")
+
+# lendo do kafka
+df_raw = (
+    spark.readStream
+         .format("kafka")
+         .option("kafka.bootstrap.servers", "localhost:9092")
+         .option("subscribe", "discord_messages")
+         .option("startingOffsets", "latest")  # pode usar earliest
+         .load()
+)
+
+df_text = df_raw.selectExpr("CAST(value AS STRING) as json_str")
+
 schema = StructType([
     StructField("author_id", StringType(), True),
     StructField("author_name", StringType(), True),
@@ -34,50 +30,32 @@ schema = StructType([
     StructField("message_timestamp", StringType(), True)
 ])
 
-# 1. Leitura do Kafka
-df_raw = spark \
-    .readStream \
-    .format("kafka") \
-    .option("kafka.bootstrap.servers", KAFKA_SERVER) \
-    .option("subscribe", KAFKA_TOPIC) \
-    .option("startingOffsets", "latest") \
-    .load()
+# Converte JSON → colunas estruturadas
+df_parsed = df_text.select(
+    from_json(col("json_str"), schema).alias("data")
+).select("data.*")
 
-# 2. Deserialização e Parse
-df_parsed = df_raw.selectExpr("CAST(value AS STRING) AS json_value") \
-    .select(from_json(col("json_value"), schema).alias("data")) \
-    .select(
-        col("data.author_name"),
-        col("data.content"),
-        col("data.message_timestamp").cast(TimestampType()).alias("timestamp_processed"),
-        col("timestamp").alias("kafka_timestamp")
-    )
-
-# 3. Análise (O BLOCO QUE FALTAVA)
-df_analysis = df_parsed.withWatermark("timestamp_processed", "1 minute") \
-    .groupBy(window(col("timestamp_processed"), "1 minute", "30 seconds"), col("author_name")) \
-    .agg(count("*").alias("message_count")) \
-    .orderBy("window")
-
-# 4. Achatamos a coluna "window" para o ES
-df_to_es = df_analysis.select(
-    col("window.start").alias("start_time"),
-    col("window.end").alias("end_time"),
-    col("author_name"),
-    col("message_count")
+# Converte para timestamp real (já que vem string do Kafka)
+df_parsed = df_parsed.withColumn(
+    "message_timestamp", to_timestamp("message_timestamp")
 )
 
-# 5. Saída (Sink) - Envia para o Elasticsearch
-query = df_to_es \
-    .writeStream \
-    .outputMode("update") \
-    .format("elasticsearch") \
-    .option("es.nodes", 'elasticsearch') \
-    .option("es.port", "9200") \
-    .option("es.resource", ES_INDEX) \
-    .option("checkpointLocation", CHECKPOINT_DIR) \
-    .trigger(processingTime='10 seconds') \
-    .start()
+# df_parsed.writeStream \
+#     .format("org.elasticsearch.spark.sql") \
+#     .option("es.nodes", "elasticsearch:9200") \
+#     .option("es.nodes.wan.only", "true") \
+#     .option("es.resource", "discord_messages/_doc") \
+#     .option("checkpointLocation", "/app/tmp/checkpoint") \
+#     .start()
 
-print("Spark Structured Streaming iniciado DENTRO DO CONTAINER. Enviando dados para o ES...")
+query = (
+    df_parsed.writeStream
+        .outputMode("append")
+        .format("console")
+        .option("truncate", False)
+        .start()
+)
+
+
+
 query.awaitTermination()
